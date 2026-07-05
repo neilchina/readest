@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Play, Download, Upload, Trash2, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Play, Download, Upload, Trash2, RefreshCw, Square, Pause } from 'lucide-react';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { StoryboardGenerator, storyboardStore } from '@/services/ai/storyboard';
@@ -41,8 +41,10 @@ interface StoryboardPanelProps {
 
 export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState<StoryboardProgress | null>(null);
   const [storyboards, setStoryboards] = useState<StoryboardJSON[]>([]);
+  const generatorRef = useRef<StoryboardGenerator | null>(null);
 
   const { getBookData } = useBookDataStore();
   const { settings } = useSettingsStore();
@@ -80,6 +82,7 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
     if (!bookData?.bookDoc || !settings.aiSettings.enabled) return;
 
     setIsGenerating(true);
+    setIsPaused(false);
     setProgress({
       phase: 'extracting',
       current: 0,
@@ -89,45 +92,20 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
     });
 
     try {
-      // 创建任务记录（暂时不追踪任务状态）
-      const _taskId = await storyboardStore.createTask({
-        bookHash,
-        bookTitle,
-        status: 'pending',
-        progress: {
-          phase: 'extracting',
-          current: 0,
-          total: bookData.bookDoc.sections?.length || 1,
-          completedScenes: 0,
-          failedScenes: 0,
-        },
-        settings: {
-          provider: settings.aiSettings.provider,
-          model: settings.aiSettings.ollamaModel || settings.aiSettings.aiGatewayModel || '',
-          embeddingModel:
-            settings.aiSettings.ollamaEmbeddingModel ||
-            settings.aiSettings.aiGatewayEmbeddingModel ||
-            '',
-        },
-        totalScenes: 0,
-      });
-      console.log('Storyboard task created:', _taskId);
-
-      // Task state tracking removed for simplicity
-
       const generator = new StoryboardGenerator(settings.aiSettings);
+      generatorRef.current = generator;
 
       const results = await generator.generateFromBook(
         bookData.bookDoc,
         bookHash,
         bookTitle,
-        (p) => {
+        (p: StoryboardProgress) => {
           setProgress(p);
         },
       );
 
       // 保存生成的分镜数据
-      const storyboardsWithMeta = results.map((sb, idx) => ({
+      const storyboardsWithMeta = results.map((sb: StoryboardJSON, idx: number) => ({
         ...sb,
         id: `${bookHash}-storyboard-${Date.now()}-${idx}`,
         bookHash,
@@ -136,21 +114,47 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
 
       await storyboardStore.saveStoryboards(storyboardsWithMeta);
       setStoryboards((prev) => [...prev, ...results]);
-
-      // Task state tracking removed for simplicity
     } catch (error) {
       console.error('Storyboard generation failed:', error);
+      const errorMessage = (error as Error).message;
       setProgress((prev) =>
         prev
           ? {
               ...prev,
-              errorMessage: (error as Error).message,
+              errorMessage: errorMessage,
             }
           : null,
       );
     } finally {
       setIsGenerating(false);
+      setIsPaused(false);
+      generatorRef.current = null;
     }
+  };
+
+  const handlePause = () => {
+    if (generatorRef.current) {
+      generatorRef.current.cancel();
+      setIsPaused(true);
+      setIsGenerating(false);
+    }
+  };
+
+  const handleStop = () => {
+    if (generatorRef.current) {
+      generatorRef.current.cancel();
+      generatorRef.current = null;
+    }
+    setIsGenerating(false);
+    setIsPaused(false);
+    setProgress((prev) =>
+      prev
+        ? {
+            ...prev,
+            errorMessage: 'Generation stopped by user',
+          }
+        : null,
+    );
   };
 
   const handleClear = async () => {
@@ -209,6 +213,48 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
         </div>
 
         <div className='flex gap-2'>
+          {isGenerating ? (
+            <>
+              <Button size='sm' onClick={handlePause} disabled={!isGenerating || isPaused}>
+                <Pause className='mr-1 h-4 w-4' />
+                暂停
+              </Button>
+              <Button variant='destructive' size='sm' onClick={handleStop}>
+                <Square className='mr-1 h-4 w-4' />
+                停止
+              </Button>
+            </>
+          ) : (
+            <Button
+              size='sm'
+              onClick={handleGenerate}
+              disabled={isGenerating || !settings.aiSettings.enabled}
+            >
+              {isPaused ? (
+                <>
+                  <Play className='mr-1 h-4 w-4' />
+                  继续生成
+                </>
+              ) : (
+                <>
+                  <Play className='mr-1 h-4 w-4' />
+                  开始生成分镜
+                </>
+              )}
+            </Button>
+          )}
+
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={handleClear}
+            disabled={storyboards.length === 0 || isGenerating}
+            className='text-error'
+          >
+            <Trash2 className='mr-1 h-4 w-4' />
+            清除
+          </Button>
+
           <Button
             variant='outline'
             size='sm'
@@ -228,35 +274,6 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
               </span>
             </Button>
           </label>
-
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={handleClear}
-            disabled={storyboards.length === 0 || isGenerating}
-            className='text-error'
-          >
-            <Trash2 className='mr-1 h-4 w-4' />
-            清除
-          </Button>
-
-          <Button
-            size='sm'
-            onClick={handleGenerate}
-            disabled={isGenerating || !settings.aiSettings.enabled}
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className='mr-1 h-4 w-4 animate-spin' />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Play className='mr-1 h-4 w-4' />
-                开始生成分镜
-              </>
-            )}
-          </Button>
         </div>
       </div>
 
@@ -278,8 +295,14 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
             <div className='flex items-center justify-between'>
               <CardTitle className='text-sm font-medium'>生成进度</CardTitle>
               <span className='text-xs text-gray-500'>
-                {progress.phase === 'extracting' ? '提取场景' : '生成分镜'} | 完成：
-                {progress.completedScenes}/{progress.current}/{progress.total}
+                {isPaused ? (
+                  <span className='text-yellow-600'>已暂停</span>
+                ) : progress.phase === 'extracting' ? (
+                  '提取场景'
+                ) : (
+                  '生成分镜'
+                )}{' '}
+                | 完成：{progress.completedScenes}/{progress.current}/{progress.total}
                 {progress.failedScenes > 0 && (
                   <span className='text-error ml-2'>失败：{progress.failedScenes}</span>
                 )}
@@ -308,7 +331,9 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
             </CardContent>
           </Card>
         ) : (
-          storyboards.map((sb, idx) => <StoryboardItem key={idx} storyboard={sb} index={idx + 1} />)
+          storyboards.map((sb: StoryboardJSON, idx: number) => (
+            <StoryboardItem key={idx} storyboard={sb} index={idx + 1} />
+          ))
         )}
       </div>
 

@@ -205,76 +205,75 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
 
   return (
     <div className='flex h-full flex-col space-y-4 p-4'>
-      {/* 标题和操作栏 */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h2 className='text-lg font-semibold'>AI 分镜生成器</h2>
-          <p className='mt-1 text-sm text-gray-500'>将书籍内容转换为电影分镜剧本</p>
-        </div>
+      {/* 标题 */}
+      <div>
+        <h2 className='text-lg font-semibold'>AI 分镜生成器</h2>
+        <p className='mt-1 text-sm text-gray-500'>将书籍内容转换为电影分镜剧本</p>
+      </div>
 
-        <div className='flex gap-2'>
-          {isGenerating ? (
-            <>
-              <Button size='sm' onClick={handlePause} disabled={!isGenerating || isPaused}>
-                <Pause className='mr-1 h-4 w-4' />
-                暂停
-              </Button>
-              <Button variant='destructive' size='sm' onClick={handleStop}>
-                <Square className='mr-1 h-4 w-4' />
-                停止
-              </Button>
-            </>
-          ) : (
-            <Button
-              size='sm'
-              onClick={handleGenerate}
-              disabled={isGenerating || !settings.aiSettings.enabled}
-            >
-              {isPaused ? (
-                <>
-                  <Play className='mr-1 h-4 w-4' />
-                  继续生成
-                </>
-              ) : (
-                <>
-                  <Play className='mr-1 h-4 w-4' />
-                  开始生成分镜
-                </>
-              )}
+      {/* 操作栏 */}
+      <div className='flex gap-2'>
+        {isGenerating ? (
+          <>
+            <Button size='sm' onClick={handlePause} disabled={!isGenerating || isPaused}>
+              <Pause className='mr-1 h-4 w-4' />
+              暂停
             </Button>
-          )}
-
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={handleClear}
-            disabled={storyboards.length === 0 || isGenerating}
-            className='text-error'
-          >
-            <Trash2 className='mr-1 h-4 w-4' />
-            清除
-          </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={handleExport}
-            disabled={storyboards.length === 0 || isGenerating}
-          >
-            <Download className='mr-1 h-4 w-4' />
-            导出
-          </Button>
-
-          <label>
-            <input type='file' accept='.json' onChange={handleImport} className='hidden' />
-            <Button variant='outline' size='sm' asChild disabled={isGenerating}>
-              <span>
-                <Upload className='mr-1 h-4 w-4' />
-                导入
-              </span>
+            <Button variant='destructive' size='sm' onClick={handleStop}>
+              <Square className='mr-1 h-4 w-4' />
+              停止
             </Button>
-          </label>
-        </div>
+          </>
+        ) : (
+          <Button
+            size='sm'
+            onClick={handleGenerate}
+            disabled={isGenerating || !settings.aiSettings.enabled}
+          >
+            {isPaused ? (
+              <>
+                <Play className='mr-1 h-4 w-4' />
+                继续生成
+              </>
+            ) : (
+              <>
+                <Play className='mr-1 h-4 w-4' />
+                开始生成分镜
+              </>
+            )}
+          </Button>
+        )}
+
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={handleClear}
+          disabled={storyboards.length === 0 || isGenerating}
+          className='text-error'
+        >
+          <Trash2 className='mr-1 h-4 w-4' />
+          清除
+        </Button>
+
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={handleExport}
+          disabled={storyboards.length === 0 || isGenerating}
+        >
+          <Download className='mr-1 h-4 w-4' />
+          导出
+        </Button>
+
+        <label>
+          <input type='file' accept='.json' onChange={handleImport} className='hidden' />
+          <Button variant='outline' size='sm' asChild disabled={isGenerating}>
+            <span>
+              <Upload className='mr-1 h-4 w-4' />
+              导入
+            </span>
+          </Button>
+        </label>
       </div>
 
       {/* AI 设置提示 */}

@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useSettingsStore } from '@/store/settingsStore';
+import type { NotebookTab } from '@/store/notebookStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useSidebarStore } from '@/store/sidebarStore';
@@ -29,9 +30,6 @@ import NoteEditor from './NoteEditor';
 import SearchBar from './SearchBar';
 import NotebookTabNavigation from './NotebookTabNavigation';
 
-// AI 子标签页类型
-type AISubTab = 'chat' | 'storyboard';
-
 const MIN_NOTEBOOK_WIDTH = 0.15;
 const MAX_NOTEBOOK_WIDTH = 0.45;
 
@@ -57,9 +55,6 @@ const Notebook: React.FC = ({}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isMobile = window.innerWidth < 640;
   const [isFullHeightInMobile, setIsFullHeightInMobile] = useState(isMobile);
-
-  // AI 子标签页状态
-  const [aiSubTab, setAiSubTab] = useState<AISubTab>('chat');
 
   const {
     panelRef: notebookRef,
@@ -134,7 +129,7 @@ const Notebook: React.FC = ({}) => {
     saveSysSettings(envConfig, 'globalReadSettings', newGlobalReadSettings);
   };
 
-  const handleTabChange = (tab: 'notes' | 'ai') => {
+  const handleTabChange = (tab: NotebookTab) => {
     setNotebookActiveTab(tab);
     const globalReadSettings = settings.globalReadSettings;
     const newGlobalReadSettings = { ...globalReadSettings, notebookActiveTab: tab };
@@ -350,38 +345,11 @@ const Notebook: React.FC = ({}) => {
         </div>
         {notebookActiveTab === 'ai' ? (
           <div className='flex min-h-0 flex-1 flex-col'>
-            {/* AI 子标签页导航 */}
-            <div className='border-base-300 flex border-b'>
-              <button
-                className={`px-4 py-2 text-sm font-medium ${
-                  aiSubTab === 'chat'
-                    ? 'border-primary text-primary border-b-2'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setAiSubTab('chat')}
-              >
-                AI 聊天
-              </button>
-              <button
-                className={`px-4 py-2 text-sm font-medium ${
-                  aiSubTab === 'storyboard'
-                    ? 'border-primary text-primary border-b-2'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setAiSubTab('storyboard')}
-              >
-                分镜生成器
-              </button>
-            </div>
-
-            {/* AI 子标签页内容 */}
-            <div className='flex-1 overflow-y-auto'>
-              {aiSubTab === 'chat' ? (
-                <AIAssistant key={activeConversationId ?? 'new'} bookKey={sideBarBookKey} />
-              ) : (
-                <StoryboardPanel bookKey={sideBarBookKey} />
-              )}
-            </div>
+            <AIAssistant key={activeConversationId ?? 'new'} bookKey={sideBarBookKey} />
+          </div>
+        ) : notebookActiveTab === 'storyboard' ? (
+          <div className='flex min-h-0 flex-1 flex-col'>
+            <StoryboardPanel bookKey={sideBarBookKey} />
           </div>
         ) : (
           <div className='flex-grow overflow-y-auto px-3'>

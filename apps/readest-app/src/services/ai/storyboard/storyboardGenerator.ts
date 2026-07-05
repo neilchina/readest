@@ -27,7 +27,7 @@ function htmlToPlainText(html: string): string {
   return text.trim();
 }
 
-import { STORYBOARD_SYSTEM_PROMPT, buildStoryboardUserPrompt, JSON_REPAIR_PROMPT } from './prompts';
+import { STORYBOARD_SYSTEM_PROMPT, buildStoryboardUserPrompt } from './prompts';
 import type { StoryboardJSON, StoryboardProgress } from './types';
 import { validateAndParseJSON, extractJSONFromResponse } from './jsonValidator';
 

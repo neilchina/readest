@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Play, Download, Upload, Trash2, RefreshCw, Square, Pause } from 'lucide-react';
+import { Play, Download, Upload, Trash2, Square, Pause } from 'lucide-react';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { StoryboardGenerator, storyboardStore } from '@/services/ai/storyboard';

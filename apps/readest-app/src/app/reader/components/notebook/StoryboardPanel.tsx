@@ -39,11 +39,17 @@ interface StoryboardPanelProps {
   bookKey: string;
 }
 
+export interface BookSegment {
+  index: number;
+  content: string;
+}
+
 export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState<StoryboardProgress | null>(null);
   const [storyboards, setStoryboards] = useState<StoryboardJSON[]>([]);
+  const [segments, setSegments] = useState<BookSegment[]>([]);
   const generatorRef = useRef<StoryboardGenerator | null>(null);
 
   const { getBookData } = useBookDataStore();
@@ -92,9 +98,23 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
     });
 
     try {
+      // Step 1: Split content into segments and display them
       const generator = new StoryboardGenerator(settings.aiSettings);
       generatorRef.current = generator;
 
+      // Get segments for display
+      const segmentSize = 3000;
+      const rawSegments = await (generator as any).splitContentBySize(
+        bookData.bookDoc,
+        segmentSize,
+      );
+      const newSegments: BookSegment[] = rawSegments.map((s: { content: string }, idx: number) => ({
+        index: idx,
+        content: s.content,
+      }));
+      setSegments(newSegments);
+
+      // Step 2: Generate storyboards using the segments (user can edit before this)
       const results = await generator.generateFromBook(
         bookData.bookDoc,
         bookHash,
@@ -130,6 +150,12 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
       setIsPaused(false);
       generatorRef.current = null;
     }
+  };
+
+  const handleSegmentChange = (index: number, newContent: string) => {
+    setSegments((prev) =>
+      prev.map((seg) => (seg.index === index ? { ...seg, content: newContent } : seg)),
+    );
   };
 
   const handlePause = () => {
@@ -313,6 +339,38 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
             {progress.errorMessage && (
               <p className='text-error mt-2 text-xs'>{progress.errorMessage}</p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 书籍分段内容编辑区 */}
+      {segments.length > 0 && (
+        <Card>
+          <CardHeader className='pb-2'>
+            <div className='flex items-center justify-between'>
+              <CardTitle className='text-sm font-medium'>书籍分段内容</CardTitle>
+              <span className='text-xs text-gray-500'>共 {segments.length} 段</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className='max-h-96 space-y-3 overflow-y-auto pr-2'>
+              {segments.map((segment) => (
+                <div key={segment.index} className='rounded border bg-gray-50 p-3'>
+                  <div className='mb-2 flex items-center justify-between'>
+                    <span className='text-xs font-medium text-gray-600'>
+                      分段 {segment.index + 1}
+                    </span>
+                    <span className='text-xs text-gray-400'>{segment.content.length} 字符</span>
+                  </div>
+                  <textarea
+                    value={segment.content}
+                    onChange={(e) => handleSegmentChange(segment.index, e.target.value)}
+                    className='focus:border-primary h-24 w-full resize-none rounded border bg-white p-2 text-sm focus:outline-none'
+                    placeholder='分段内容...'
+                  />
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

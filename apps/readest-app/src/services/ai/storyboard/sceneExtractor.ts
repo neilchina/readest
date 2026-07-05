@@ -310,6 +310,11 @@ export class SceneExtractor {
     continuityContext?: ContinuationContext | null,
   ): Promise<{ scenes: BookScene[]; lastContinuityContext: ContinuationContext | null }> {
     console.log('[SceneExtractor] [processChapter] Processing chapter:', chapterTitle);
+    // 打印章节内容的具体字符串值
+    console.log(
+      '[SceneExtractor] [processChapter] Chapter content (first 300 chars):',
+      content.substring(0, 300),
+    );
 
     const fragments = this.splitIntoFragments(content);
     const accumulatedContext: AccumulatedContext = {
@@ -418,6 +423,9 @@ export class SceneExtractor {
       '[SceneExtractor] [extractIncremental] Continuity context from previous:',
       !!continuityContext,
     );
+    // 打印书籍字符串的具体内容（前 500 字符）
+    const previewContent = content.length > 500 ? content.substring(0, 500) + '...' : content;
+    console.log('[SceneExtractor] [extractIncremental] Content preview:', previewContent);
 
     const { scenes, lastContinuityContext } = await this.processChapter(
       content,

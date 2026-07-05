@@ -23,10 +23,14 @@ import { NOTE_PREFIX } from '@/types/view';
 import useShortcuts from '@/hooks/useShortcuts';
 import BooknoteItem from '../sidebar/BooknoteItem';
 import AIAssistant from './AIAssistant';
+import StoryboardPanel from './StoryboardPanel';
 import NotebookHeader from './Header';
 import NoteEditor from './NoteEditor';
 import SearchBar from './SearchBar';
 import NotebookTabNavigation from './NotebookTabNavigation';
+
+// AI 子标签页类型
+type AISubTab = 'chat' | 'storyboard';
 
 const MIN_NOTEBOOK_WIDTH = 0.15;
 const MAX_NOTEBOOK_WIDTH = 0.45;
@@ -53,6 +57,9 @@ const Notebook: React.FC = ({}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isMobile = window.innerWidth < 640;
   const [isFullHeightInMobile, setIsFullHeightInMobile] = useState(isMobile);
+
+  // AI 子标签页状态
+  const [aiSubTab, setAiSubTab] = useState<AISubTab>('chat');
 
   const {
     panelRef: notebookRef,
@@ -343,7 +350,38 @@ const Notebook: React.FC = ({}) => {
         </div>
         {notebookActiveTab === 'ai' ? (
           <div className='flex min-h-0 flex-1 flex-col'>
-            <AIAssistant key={activeConversationId ?? 'new'} bookKey={sideBarBookKey} />
+            {/* AI 子标签页导航 */}
+            <div className='border-base-300 flex border-b'>
+              <button
+                className={`px-4 py-2 text-sm font-medium ${
+                  aiSubTab === 'chat'
+                    ? 'border-primary text-primary border-b-2'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setAiSubTab('chat')}
+              >
+                AI 聊天
+              </button>
+              <button
+                className={`px-4 py-2 text-sm font-medium ${
+                  aiSubTab === 'storyboard'
+                    ? 'border-primary text-primary border-b-2'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setAiSubTab('storyboard')}
+              >
+                分镜生成器
+              </button>
+            </div>
+
+            {/* AI 子标签页内容 */}
+            <div className='flex-1 overflow-y-auto'>
+              {aiSubTab === 'chat' ? (
+                <AIAssistant key={activeConversationId ?? 'new'} bookKey={sideBarBookKey} />
+              ) : (
+                <StoryboardPanel bookKey={sideBarBookKey} />
+              )}
+            </div>
           </div>
         ) : (
           <div className='flex-grow overflow-y-auto px-3'>

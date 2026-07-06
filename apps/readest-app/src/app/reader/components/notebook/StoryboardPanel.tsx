@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Play, Download, Upload, Trash2, Square, Pause } from 'lucide-react';
+import { Play, Download, Upload, Trash2, Square, Pause, ChevronDown } from 'lucide-react';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { StoryboardGenerator, storyboardStore } from '@/services/ai/storyboard';
@@ -44,6 +44,15 @@ export interface BookSegment {
   content: string;
 }
 
+interface SystemPromptHistory {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: number;
+}
+
+const STORAGE_KEY = 'storyboard_system_prompts';
+
 export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -52,12 +61,47 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
   const [segments, setSegments] = useState<BookSegment[]>([]);
   const generatorRef = useRef<StoryboardGenerator | null>(null);
 
+  // 自定义系统提示词相关状态
+  const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
+  const [selectedPromptId, setSelectedPromptId] = useState<string>('');
+  const [promptHistory, setPromptHistory] = useState<SystemPromptHistory[]>([]);
+  const [isPromptDropdownOpen, setIsPromptDropdownOpen] = useState(false);
+  const promptDropdownRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (promptDropdownRef.current && !promptDropdownRef.current.contains(event.target as Node)) {
+        setIsPromptDropdownOpen(false);
+      }
+    };
+    if (isPromptDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isPromptDropdownOpen]);
+
   const { getBookData } = useBookDataStore();
   const { settings } = useSettingsStore();
 
   const bookData = getBookData(bookKey);
   const bookHash = bookKey.split('-')[0] || '';
   const bookTitle = bookData?.book?.title || 'Unknown Book';
+
+  // 加载历史记录（从 localStorage）
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const prompts: SystemPromptHistory[] = JSON.parse(saved);
+          setPromptHistory(prompts);
+        } catch (e) {
+          console.error('Failed to parse prompt history:', e);
+        }
+      }
+    }
+  }, []);
 
   // 加载已保存的分镜数据
   useEffect(() => {
@@ -82,6 +126,49 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
     } catch (error) {
       console.error('Failed to load tasks:', error);
     }
+  };
+
+  // 保存提示词到 localStorage
+  const saveToStorage = (prompts: SystemPromptHistory[]) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+    }
+  };
+
+  // 保存当前提示词
+  const saveCurrentPrompt = () => {
+    const name = prompt('请输入提示词名称：');
+    if (!name || !customSystemPrompt.trim()) return;
+
+    const newPrompt: SystemPromptHistory = {
+      id: Date.now().toString(),
+      name,
+      content: customSystemPrompt,
+      createdAt: Date.now(),
+    };
+
+    const updated = [newPrompt, ...promptHistory].slice(0, 20); // 最多保存 20 条
+    setPromptHistory(updated);
+    saveToStorage(updated);
+    alert('提示词已保存');
+  };
+
+  // 加载选中的提示词
+  const loadPrompt = (id: string) => {
+    setSelectedPromptId(id);
+    if (!id) {
+      return;
+    }
+    const item = promptHistory.find((p) => p.id === id);
+    if (item) {
+      setCustomSystemPrompt(item.content);
+    }
+  };
+
+  // 清空提示词
+  const clearPrompt = () => {
+    setCustomSystemPrompt('');
+    setSelectedPromptId('');
   };
 
   const handleGenerate = async () => {
@@ -122,6 +209,7 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
         (p: StoryboardProgress) => {
           setProgress(p);
         },
+        customSystemPrompt || undefined, // 传递自定义提示词
       );
 
       // 保存生成的分镜数据
@@ -234,7 +322,6 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
       {/* 标题 */}
       <div>
         <h2 className='text-lg font-semibold'>AI 分镜生成器</h2>
-        <p className='mt-1 text-sm text-gray-500'>将书籍内容转换为电影分镜剧本</p>
       </div>
 
       {/* 操作栏 */}
@@ -251,23 +338,67 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({ bookKey }) => 
             </Button>
           </>
         ) : (
-          <Button
-            size='sm'
-            onClick={handleGenerate}
-            disabled={isGenerating || !settings.aiSettings.enabled}
-          >
-            {isPaused ? (
-              <>
-                <Play className='mr-1 h-4 w-4' />
-                继续生成
-              </>
-            ) : (
-              <>
-                <Play className='mr-1 h-4 w-4' />
-                开始生成分镜
-              </>
+          <div className='relative' ref={promptDropdownRef}>
+            <Button size='sm' onClick={() => setIsPromptDropdownOpen(!isPromptDropdownOpen)}>
+              {customSystemPrompt ? '自定义提示词 ▼' : '开始生成分镜 ▼'}
+              <ChevronDown
+                className={`ml-1 h-4 w-4 transition-transform ${isPromptDropdownOpen ? 'rotate-180' : ''}`}
+              />
+            </Button>
+
+            {/* 下拉菜单内容 */}
+            {isPromptDropdownOpen && (
+              <div className='bg-base-100 absolute left-0 top-full z-50 mt-2 w-96 rounded-lg border shadow-lg'>
+                <div className='p-4'>
+                  {/* 历史记录选择区 */}
+                  <div className='mb-3'>
+                    <div className='mb-2 flex items-center justify-between'>
+                      <span className='text-xs font-medium text-gray-600'>历史提示词</span>
+                      <Button size='sm' onClick={saveCurrentPrompt}>
+                        保存当前
+                      </Button>
+                    </div>
+                    <select
+                      value={selectedPromptId}
+                      onChange={(e) => loadPrompt(e.target.value)}
+                      className='bg-base-100 w-full rounded border p-1 text-sm'
+                    >
+                      <option value=''>自定义输入...</option>
+                      {promptHistory.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 编辑区 */}
+                  <textarea
+                    value={customSystemPrompt}
+                    onChange={(e) => setCustomSystemPrompt(e.target.value)}
+                    placeholder='输入自定义规则提示词（留空则使用默认）...'
+                    className='bg-base-100 focus:border-primary h-40 w-full resize-none rounded border p-2 text-sm focus:outline-none'
+                  />
+
+                  {/* 操作按钮 */}
+                  <div className='mt-3 flex justify-between gap-2'>
+                    <Button variant='outline' size='sm' onClick={clearPrompt}>
+                      清空
+                    </Button>
+                    <Button
+                      size='sm'
+                      onClick={() => {
+                        setIsPromptDropdownOpen(false);
+                        handleGenerate();
+                      }}
+                    >
+                      开始生成
+                    </Button>
+                  </div>
+                </div>
+              </div>
             )}
-          </Button>
+          </div>
         )}
 
         <Button

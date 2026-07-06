@@ -73,6 +73,7 @@ export class StoryboardGenerator {
     bookHash: string,
     _bookTitle: string,
     onProgress?: (progress: StoryboardProgress) => void,
+    customSystemPrompt?: string,
   ): Promise<StoryboardJSON[]> {
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
@@ -171,7 +172,11 @@ export class StoryboardGenerator {
       checkAbort();
 
       try {
-        const storyboard = await this.generateSingleStoryboard(allScenes[i]!);
+        const storyboard = await this.generateSingleStoryboard(
+          allScenes[i]!,
+          undefined,
+          customSystemPrompt,
+        );
         storyboards.push(storyboard);
 
         onProgress?.({
@@ -265,7 +270,11 @@ export class StoryboardGenerator {
     return segments.length > 0 ? segments : [{ content }];
   }
 
-  async generateSingleStoryboard(scene: BookScene, maxRetries?: number): Promise<StoryboardJSON> {
+  async generateSingleStoryboard(
+    scene: BookScene,
+    maxRetries?: number,
+    customSystemPrompt?: string,
+  ): Promise<StoryboardJSON> {
     const retries = maxRetries ?? this.config.maxRetries;
     const prompt = buildStoryboardUserPrompt(scene);
 
@@ -277,7 +286,7 @@ export class StoryboardGenerator {
         const model = provider.getModel();
         const result = streamText({
           model,
-          system: STORYBOARD_SYSTEM_PROMPT,
+          system: customSystemPrompt || STORYBOARD_SYSTEM_PROMPT,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
         });
